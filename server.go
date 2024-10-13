@@ -71,7 +71,7 @@ func handlePacket(conn *net.UDPConn, addr *net.UDPAddr, packet []byte) {
 		}
 		// Start sending option requests every minute
 		startOptionRequestTimer(conn, addr)
-
+		AckRegister(conn, addr)
 	} else {
 		// Known connection
 		connection := connections[clientIP]
@@ -95,12 +95,24 @@ func handlePacket(conn *net.UDPConn, addr *net.UDPAddr, packet []byte) {
 	}
 }
 
+func AckRegister(conn *net.UDPConn, addr *net.UDPAddr) {
+	clientIP := addr.String()
+
+	log.Printf("Sending AckRegister to %s\n", clientIP)
+
+	_, err := conn.WriteToUDP([]byte("AckRegister"), addr)
+	if err != nil {
+		log.Printf("Failed to send option request to %s: %v\n", clientIP, err)
+		return
+	}
+}
+
 func startOptionRequestTimer(conn *net.UDPConn, addr *net.UDPAddr) {
 	clientIP := addr.String()
 	connection := connections[clientIP]
 
 	// Send an option request after 1 minute
-	connection.timer = time.AfterFunc(1*time.Minute, func() {
+	connection.timer = time.AfterFunc(15*time.Second, func() {
 		sendOptionRequest(conn, addr)
 	})
 }
