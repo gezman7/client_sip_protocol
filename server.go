@@ -112,7 +112,7 @@ func startOptionRequestTimer(conn *net.UDPConn, addr *net.UDPAddr) {
 	connection := connections[clientIP]
 
 	// Send an option request after 1 minute
-	connection.timer = time.AfterFunc(15*time.Second, func() {
+	connection.timer = time.AfterFunc(1*time.Minute, func() {
 		sendOptionRequest(conn, addr)
 	})
 }
