@@ -104,7 +104,6 @@ func handlePacket(conn *net.UDPConn, addr *net.UDPAddr, packet []byte) {
 		connection.IsClosed = false
 		connection.NumOfOptionsSent = 0
 		connection.LastAckRcv = time.Now()
-		connection.Created = time.Now()
 		fmt.Printf("ACK received from %s\n", clientIP)
 
 		// Restart the option request timer
