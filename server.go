@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -25,6 +26,10 @@ var (
 )
 
 func main() {
+
+	ip := flag.String("ip", "127.0.0.1", "Server IP address")
+	port := flag.String("port", "8060", "Server port")
+
 	addr := net.UDPAddr{
 		Port: 8060,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -38,6 +43,7 @@ func main() {
 	defer conn.Close()
 
 	log.Println("UDP Server started on port 8060")
+	go inviteClient(*ip, *port)
 
 	for {
 		// Buffer to read incoming packets
@@ -51,6 +57,19 @@ func main() {
 		// Process the incoming packet in a separate goroutine
 		go handlePacket(conn, remoteAddr, buffer[:n])
 	}
+}
+
+func inviteClient(ip string, port string) {
+	clientAddr := fmt.Sprintf("%s:%s", ip, port)
+
+	// Connect to the server
+	conn, err := net.Dial("udp", clientAddr)
+	if err != nil {
+		log.Fatalf("Failed to connect to server at %s: %v\n", clientAddr, err)
+	}
+	defer conn.Close()
+
+	sendPacket(conn, "Invite")
 }
 
 func handlePacket(conn *net.UDPConn, addr *net.UDPAddr, packet []byte) {
@@ -161,4 +180,9 @@ func sendOptionRequest(conn *net.UDPConn, addr *net.UDPAddr) {
 			return
 		}
 	})
+}
+
+func sendPacket(conn net.Conn, message string) error {
+	_, err := conn.Write([]byte(message))
+	return err
 }

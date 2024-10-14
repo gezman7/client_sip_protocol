@@ -36,8 +36,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Combine IP and port into the server address
-	serverAddr := fmt.Sprintf("%s:%s", *ip, *port)
+	serverAddr := listenForInvite()
+	log.Printf("Received Invite packet from server: %s\n", serverAddr)
 
 	// Connect to the server
 	conn, err := net.Dial("udp", serverAddr)
@@ -46,14 +46,15 @@ func main() {
 	}
 	defer conn.Close()
 
-	fmt.Printf("Connected to server at %s\n", serverAddr)
+	log.Printf("Connected to server at %s\n", serverAddr)
 
 	// Register the client with the server
 	err = sendPacket(conn, "Register")
 	if err != nil {
 		log.Fatalf("Failed to send Register packet: %v\n", err)
 	}
-	fmt.Println("Sent Register packet to server")
+
+	log.Printf("Sent Register packet to server: %v\n", conn.RemoteAddr())
 
 	// Continuously listen for incoming OptionRequest packets and respond with ACK
 	buffer := make([]byte, 1024)
@@ -82,6 +83,29 @@ func main() {
 			}
 		}
 	}
+}
+
+func listenForInvite() string {
+	addr := net.UDPAddr{
+		Port: 8060,
+		IP:   net.ParseIP("0.0.0.0"),
+	}
+
+	conn, err := net.ListenUDP("udp", &addr)
+	if err != nil {
+		log.Fatalf("Failed to set up server: %v\n", err)
+	}
+	defer conn.Close()
+
+	buffer := make([]byte, 1024)
+	conn.Read(buffer)
+
+	if string(buffer) == "Invite" {
+		return conn.RemoteAddr().String()
+	}
+
+	log.Fatalf("Failed to receive Invite packet: %v\n", err)
+	return ""
 }
 
 func sendPacket(conn net.Conn, message string) error {
