@@ -27,7 +27,7 @@ var (
 
 func main() {
 
-	ip := flag.String("ip", "127.0.0.1", "Server IP address")
+	ip := flag.String("ip", "10.0.1.27", "Server IP address")
 	port := flag.String("port", "8060", "Server port")
 
 	addr := net.UDPAddr{
@@ -43,7 +43,7 @@ func main() {
 	defer conn.Close()
 
 	log.Println("UDP Server started on port 8060")
-	go inviteClient(*ip, *port)
+	inviteClient(*ip, *port)
 
 	for {
 		// Buffer to read incoming packets
@@ -61,7 +61,7 @@ func main() {
 
 func inviteClient(ip string, port string) {
 	clientAddr := fmt.Sprintf("%s:%s", ip, port)
-
+	log.Printf("Inviting client at %s\n", clientAddr)
 	// Connect to the server
 	conn, err := net.Dial("udp", clientAddr)
 	if err != nil {

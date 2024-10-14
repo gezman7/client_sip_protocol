@@ -1,40 +1,38 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"time"
 )
 
 func main() {
-	// Define command-line flags for IP and port
-	ip := flag.String("ip", "127.0.0.1", "Server IP address")
-	port := flag.String("port", "8060", "Server port")
-	help := flag.Bool("help", false, "Display help")
-
-	// Parse command-line flags
-	flag.Parse()
-
-	// Display help if requested
-	if *help {
-		fmt.Println("Usage:")
-		fmt.Println("  client -ip <server_ip> -port <server_port>")
-		fmt.Println("Options:")
-		fmt.Println("  -ip      Server IP address (default: 127.0.0.1)")
-		fmt.Println("  -port    Server port (default: 8060)")
-		fmt.Println("  -help    Display this help message")
-		return
-	}
-
-	// Validate IP and port
-	if *ip == "" || *port == "" {
-		fmt.Println("Error: IP and port must both be specified.")
-		flag.Usage()
-		os.Exit(1)
-	}
+	//// Define command-line flags for IP and port
+	//ip := flag.String("ip", "127.0.0.1", "Server IP address")
+	//port := flag.String("port", "8060", "Server port")
+	//help := flag.Bool("help", false, "Display help")
+	//
+	//// Parse command-line flags
+	//flag.Parse()
+	//
+	//// Display help if requested
+	//if *help {
+	//	fmt.Println("Usage:")
+	//	fmt.Println("  client -ip <server_ip> -port <server_port>")
+	//	fmt.Println("Options:")
+	//	fmt.Println("  -ip      Server IP address (default: 127.0.0.1)")
+	//	fmt.Println("  -port    Server port (default: 8060)")
+	//	fmt.Println("  -help    Display this help message")
+	//	return
+	//}
+	//
+	//// Validate IP and port
+	//if *ip == "" || *port == "" {
+	//	fmt.Println("Error: IP and port must both be specified.")
+	//	flag.Usage()
+	//	os.Exit(1)
+	//}
 
 	serverAddr := listenForInvite()
 	log.Printf("Received Invite packet from server: %s\n", serverAddr)
@@ -91,6 +89,7 @@ func listenForInvite() string {
 		IP:   net.ParseIP("0.0.0.0"),
 	}
 
+	log.Printf("Listening for Invite packet on port %d\n", addr.Port)
 	conn, err := net.ListenUDP("udp", &addr)
 	if err != nil {
 		log.Fatalf("Failed to set up server: %v\n", err)
