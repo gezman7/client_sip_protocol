@@ -61,10 +61,21 @@ func main() {
 
 func inviteClient(ip string, port string) {
 	time.Sleep(2 * time.Second)
-	clientAddr := fmt.Sprintf("%s:%s", ip, port)
-	log.Printf("Inviting client at %s\n", clientAddr)
+
+	clientAddr := &net.UDPAddr{
+		IP:   net.ParseIP(ip),
+		Port: 8060,
+	}
+
+	log.Printf("Inviting client at %+v\n", clientAddr)
+
+	localAddr := &net.UDPAddr{
+		IP:   net.ParseIP("10.0.0.106"), // Your local IP
+		Port: 8060,                      // Desired local port
+	}
+
 	// Connect to the server
-	conn, err := net.Dial("udp", clientAddr)
+	conn, err := net.DialUDP("udp", localAddr, clientAddr)
 	if err != nil {
 		log.Fatalf("Failed to connect to server at %s: %v\n", clientAddr, err)
 	}
