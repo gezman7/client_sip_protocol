@@ -30,8 +30,8 @@ func main() {
 	ip := flag.String("ip", "10.0.1.27", "Server IP address")
 
 	addr := &net.UDPAddr{
-		IP:   net.ParseIP("10.0.0.106"), // Your local IP
-		Port: 8060,                      // Desired local port
+		IP:   net.ParseIP("0.0.0.0"), // Your local IP
+		Port: 8060,                   // Desired local port
 	}
 
 	// Start listening for incoming connections
@@ -66,7 +66,7 @@ func inviteClient(conn *net.UDPConn, ip string) {
 		Port: 5060,
 	}
 
-	log.Printf("Inviting client at %+v\n", clientAddr)
+	log.Printf("Inviting client at %+v\n with port 5060", clientAddr)
 
 	_, err := conn.WriteToUDP([]byte("Invite"), clientAddr)
 	if err != nil {

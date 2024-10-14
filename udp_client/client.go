@@ -38,7 +38,7 @@ func main() {
 	log.Printf("Received Invite packet from server: %s\n", rAddr)
 
 	lAddr := &net.UDPAddr{
-		IP:   net.ParseIP("10.0.1.27"),
+		IP:   net.ParseIP("0.0.0.0"),
 		Port: 5060,
 	}
 	// Connect to the server
