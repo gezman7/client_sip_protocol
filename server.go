@@ -43,7 +43,7 @@ func main() {
 	defer conn.Close()
 
 	log.Println("UDP Server started on port 8060")
-	inviteClient(*ip, *port)
+	go inviteClient(*ip, *port)
 
 	for {
 		// Buffer to read incoming packets
@@ -60,6 +60,7 @@ func main() {
 }
 
 func inviteClient(ip string, port string) {
+	time.Sleep(2 * time.Second)
 	clientAddr := fmt.Sprintf("%s:%s", ip, port)
 	log.Printf("Inviting client at %s\n", clientAddr)
 	// Connect to the server

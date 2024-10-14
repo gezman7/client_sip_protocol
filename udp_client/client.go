@@ -97,10 +97,15 @@ func listenForInvite() string {
 	defer conn.Close()
 
 	buffer := make([]byte, 1024)
-	conn.Read(buffer)
+	n, remoteAddr, err := conn.ReadFromUDP(buffer)
+	if err != nil {
+		log.Fatalf("Failed to read from UDP connection: %v\n", err)
+	}
 
-	if string(buffer) == "Invite" {
-		return conn.RemoteAddr().String()
+	log.Printf("Received Invite packet from server: %s\n", remoteAddr.String())
+	packet := string(buffer[:n])
+	if packet == "Invite" {
+		return remoteAddr.String()
 	}
 
 	log.Fatalf("Failed to receive Invite packet: %v\n", err)
