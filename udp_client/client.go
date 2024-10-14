@@ -34,17 +34,21 @@ func main() {
 	//	os.Exit(1)
 	//}
 
-	serverAddr := listenForInvite()
-	log.Printf("Received Invite packet from server: %s\n", serverAddr)
+	rAddr := listenForInvite()
+	log.Printf("Received Invite packet from server: %s\n", rAddr)
 
+	lAddr := &net.UDPAddr{
+		IP:   net.ParseIP("10.0.1.27"),
+		Port: 5060,
+	}
 	// Connect to the server
-	conn, err := net.Dial("udp", serverAddr)
+	conn, err := net.DialUDP("udp", lAddr, rAddr)
 	if err != nil {
-		log.Fatalf("Failed to connect to server at %s: %v\n", serverAddr, err)
+		log.Fatalf("Failed to connect to server at %s: %v\n", rAddr, err)
 	}
 	defer conn.Close()
 
-	log.Printf("Connected to server at %s\n", serverAddr)
+	log.Printf("Connected to server at %s\n", rAddr)
 
 	// Register the client with the server
 	err = sendPacket(conn, "Register")
@@ -83,9 +87,9 @@ func main() {
 	}
 }
 
-func listenForInvite() string {
+func listenForInvite() *net.UDPAddr {
 	addr := net.UDPAddr{
-		Port: 8060,
+		Port: 5060,
 		IP:   net.ParseIP("0.0.0.0"),
 	}
 
@@ -105,11 +109,11 @@ func listenForInvite() string {
 	log.Printf("Received Invite packet from server: %s\n", remoteAddr.String())
 	packet := string(buffer[:n])
 	if packet == "Invite" {
-		return remoteAddr.String()
+		return remoteAddr
 	}
 
 	log.Fatalf("Failed to receive Invite packet: %v\n", err)
-	return ""
+	return nil
 }
 
 func sendPacket(conn net.Conn, message string) error {

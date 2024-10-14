@@ -64,7 +64,7 @@ func inviteClient(ip string, port string) {
 
 	clientAddr := &net.UDPAddr{
 		IP:   net.ParseIP(ip),
-		Port: 8060,
+		Port: 5060,
 	}
 
 	log.Printf("Inviting client at %+v\n", clientAddr)
