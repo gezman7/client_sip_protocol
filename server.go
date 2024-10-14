@@ -30,20 +30,20 @@ func main() {
 	ip := flag.String("ip", "10.0.1.27", "Server IP address")
 	port := flag.String("port", "8060", "Server port")
 
-	addr := net.UDPAddr{
-		Port: 8060,
-		IP:   net.ParseIP("0.0.0.0"),
+	addr := &net.UDPAddr{
+		IP:   net.ParseIP("10.0.0.106"), // Your local IP
+		Port: 8060,                      // Desired local port
 	}
 
 	// Start listening for incoming connections
-	conn, err := net.ListenUDP("udp", &addr)
+	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
-		log.Fatalf("Failed to set up server: %v\n", err)
+		log.Fatalf("Failed to set up listening server: %v\n", err)
 	}
 	defer conn.Close()
 
 	log.Println("UDP Server started on port 8060")
-	go inviteClient(*ip, *port)
+	go inviteClient(conn, *ip)
 
 	for {
 		// Buffer to read incoming packets
@@ -59,7 +59,7 @@ func main() {
 	}
 }
 
-func inviteClient(ip string, port string) {
+func inviteClient(conn *net.UDPConn, ip string) {
 	time.Sleep(2 * time.Second)
 
 	clientAddr := &net.UDPAddr{
@@ -69,19 +69,10 @@ func inviteClient(ip string, port string) {
 
 	log.Printf("Inviting client at %+v\n", clientAddr)
 
-	localAddr := &net.UDPAddr{
-		IP:   net.ParseIP("10.0.0.106"), // Your local IP
-		Port: 8060,                      // Desired local port
-	}
-
-	// Connect to the server
-	conn, err := net.DialUDP("udp", localAddr, clientAddr)
+	_, err := conn.WriteToUDP([]byte("Invite"), clientAddr)
 	if err != nil {
-		log.Fatalf("Failed to connect to server at %s: %v\n", clientAddr, err)
+		log.Printf("Failed to send Invite packet: %v\n", err)
 	}
-	defer conn.Close()
-
-	sendPacket(conn, "Invite")
 }
 
 func handlePacket(conn *net.UDPConn, addr *net.UDPAddr, packet []byte) {
@@ -192,9 +183,4 @@ func sendOptionRequest(conn *net.UDPConn, addr *net.UDPAddr) {
 			return
 		}
 	})
-}
-
-func sendPacket(conn net.Conn, message string) error {
-	_, err := conn.Write([]byte(message))
-	return err
 }
