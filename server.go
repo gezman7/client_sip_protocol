@@ -28,7 +28,6 @@ var (
 func main() {
 
 	ip := flag.String("ip", "10.0.1.27", "Server IP address")
-	port := flag.String("port", "8060", "Server port")
 
 	addr := &net.UDPAddr{
 		IP:   net.ParseIP("10.0.0.106"), // Your local IP
