@@ -65,21 +65,19 @@ func main() {
 	}
 }
 
-func waitForRequestInvite(tcpPort int, udpConn *net.UDPConn) {
-	l, err := net.Listen("udp", fmt.Sprintf(":%d", tcpPort))
+func waitForRequestInvite(cpPort int, udpConn *net.UDPConn) {
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{
+		IP:   net.ParseIP("0.0.0.0"),
+		Port: cpPort,
+	})
 	if err != nil {
-		log.Fatalf("Failed to listen on TCP port %d: %v\n", tcpPort, err)
+		log.Fatalf("Failed to listen on TCP port %d: %v\n", cpPort, err)
 	}
-	defer l.Close()
+	defer conn.Close()
 
-	log.Printf("Listening for RequestInvite on TCP port %d\n", tcpPort)
+	log.Printf("Listening for RequestInvite on TCP port %d\n", cpPort)
 
 	for {
-		conn, err := l.Accept()
-		if err != nil {
-			log.Printf("Failed to accept TCP connection: %v\n", err)
-			continue
-		}
 		buffer := make([]byte, 1024)
 		n, err := conn.Read(buffer)
 		if err != nil {
@@ -92,6 +90,7 @@ func waitForRequestInvite(tcpPort int, udpConn *net.UDPConn) {
 			log.Printf("Failed to unmarshal request invite: %v\n", err)
 			continue
 		}
+
 		log.Printf("Received request invite from %s port:%s\n", reqInvite.AgentIP, reqInvite.LPort)
 
 		go inviteClient(udpConn, reqInvite.AgentIP, reqInvite.LPort)
