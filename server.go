@@ -46,10 +46,16 @@ func main() {
 		log.Fatalf("Failed to set up listening server: %v\n", err)
 	}
 	defer conn.Close()
-
+	wg := sync.WaitGroup{}
+	go handleRead(conn, &wg)
 	log.Printf("Listening on %s\n", lAddr)
-	go waitForRequestInvite(*tcpPort, conn)
+	reqInvite := waitForRequestInvite(*tcpPort)
 
+	inviteClient(conn, reqInvite.AgentAddr)
+	wg.Wait()
+}
+
+func handleRead(conn *net.UDPConn, wg *sync.WaitGroup) {
 	for {
 		// Buffer to read incoming packets
 		buffer := make([]byte, 1024)
@@ -62,9 +68,10 @@ func main() {
 		// Process the incoming packet in a separate goroutine
 		go handlePacket(conn, remoteAddr, buffer[:n])
 	}
+	wg.Done()
 }
 
-func waitForRequestInvite(cpPort int, udpConn *net.UDPConn) {
+func waitForRequestInvite(cpPort int) RequestInvite {
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{
 		IP:   net.ParseIP("0.0.0.0"),
 		Port: cpPort,
@@ -74,7 +81,7 @@ func waitForRequestInvite(cpPort int, udpConn *net.UDPConn) {
 	}
 	defer conn.Close()
 
-	log.Printf("Listening for RequestInvite on TCP port %d\n", cpPort)
+	log.Printf("Listening for RequestInvite on port %d\n", cpPort)
 
 	for {
 		buffer := make([]byte, 1024)
@@ -91,8 +98,7 @@ func waitForRequestInvite(cpPort int, udpConn *net.UDPConn) {
 		}
 
 		log.Printf("Received request invite from %s \n", reqInvite.AgentAddr)
-
-		go inviteClient(udpConn, reqInvite.AgentAddr)
+		return reqInvite
 	}
 }
 
@@ -105,11 +111,6 @@ func inviteClient(conn *net.UDPConn, addr string) {
 	}
 
 	log.Printf("Inviting client at %+v\n", clientAddr)
-	_, err = conn.WriteToUDP([]byte("Invite"), clientAddr)
-	if err != nil {
-		log.Printf("Failed to send Invite packet: %v\n", err)
-	}
-
 	_, err = conn.WriteToUDP([]byte("Invite"), clientAddr)
 	if err != nil {
 		log.Printf("Failed to send Invite packet: %v\n", err)
