@@ -66,7 +66,7 @@ func main() {
 }
 
 func waitForRequestInvite(tcpPort int, udpConn *net.UDPConn) {
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", tcpPort))
+	l, err := net.Listen("udp", fmt.Sprintf(":%d", tcpPort))
 	if err != nil {
 		log.Fatalf("Failed to listen on TCP port %d: %v\n", tcpPort, err)
 	}

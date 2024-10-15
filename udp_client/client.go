@@ -15,8 +15,8 @@ type sipClientConfig struct {
 	srvAddr    net.UDPAddr
 	badSrvAddr *net.UDPAddr
 	agentAddr  net.UDPAddr
-	rTcpConn   net.TCPAddr
-	lTcpConn   net.TCPAddr
+	rTcpConn   net.UDPAddr
+	lTcpConn   net.UDPAddr
 }
 
 type RequestInvite struct {
@@ -77,11 +77,11 @@ func setupClient() *sipClientConfig {
 			IP:   net.ParseIP(*lip),
 			Port: *lPort,
 		},
-		rTcpConn: net.TCPAddr{
+		rTcpConn: net.UDPAddr{
 			IP:   net.ParseIP(*ip),
 			Port: *rTcpPort,
 		},
-		lTcpConn: net.TCPAddr{
+		lTcpConn: net.UDPAddr{
 			IP:   net.ParseIP(*lip),
 			Port: *lTcplPort,
 		},
@@ -101,7 +101,7 @@ func main() {
 	go client.listenUdp(conn, wg)
 
 	// request invite from server with control plane tcp connection
-	err = client.sendTcpReq()
+	err = client.sendCpReq()
 	if err != nil {
 		log.Fatalf("Failed to send tcp RequestInvite: %v\n", err)
 	}
@@ -114,15 +114,15 @@ func main() {
 
 }
 
-func (client *sipClientConfig) sendTcpReq() error {
-	tcpConn, err := net.DialTCP("tcp", &net.TCPAddr{
+func (client *sipClientConfig) sendCpReq() error {
+	reqInviteConn, err := net.DialUDP("udp", &net.UDPAddr{
 		IP:   client.srvAddr.IP,
-		Port: client.rTcpConn.Port,
+		Port: client.lTcpConn.Port,
 	}, &client.rTcpConn)
 	if err != nil {
 		log.Fatalf("Failed to connect to server at %s: %v\n", client.rTcpConn, err)
 	}
-	defer tcpConn.Close()
+	defer reqInviteConn.Close()
 
 	reqInvite := RequestInvite{
 		AgentIP: client.agentAddr.String(),
@@ -131,7 +131,7 @@ func (client *sipClientConfig) sendTcpReq() error {
 
 	serializedReqInvite, err := json.Marshal(reqInvite)
 
-	_, err = tcpConn.Write(serializedReqInvite)
+	_, err = reqInviteConn.Write(serializedReqInvite)
 	return err
 }
 
