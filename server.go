@@ -21,8 +21,7 @@ type Connection struct {
 }
 
 type RequestInvite struct {
-	AgentIP string
-	LPort   int
+	AgentAddr string
 }
 
 // Global variables
@@ -91,22 +90,22 @@ func waitForRequestInvite(cpPort int, udpConn *net.UDPConn) {
 			continue
 		}
 
-		log.Printf("Received request invite from %s port:%s\n", reqInvite.AgentIP, reqInvite.LPort)
+		log.Printf("Received request invite from %s port:%s\n", reqInvite.AgentAddr)
 
-		go inviteClient(udpConn, reqInvite.AgentIP, reqInvite.LPort)
+		go inviteClient(udpConn, reqInvite.AgentAddr)
 	}
 }
 
-func inviteClient(conn *net.UDPConn, ip string, port int) {
+func inviteClient(conn *net.UDPConn, addr string) {
 	time.Sleep(2 * time.Second)
 
-	clientAddr := &net.UDPAddr{
-		IP:   net.ParseIP(ip),
-		Port: port,
+	clientAddr, err := net.ResolveUDPAddr("udp", addr)
+	if err != nil {
+		log.Printf("Failed to resolve UDP address from requestInvite: %v\n", err)
 	}
 
 	log.Printf("Inviting client at %+v\n", clientAddr)
-	_, err := conn.WriteToUDP([]byte("Invite"), clientAddr)
+	_, err = conn.WriteToUDP([]byte("Invite"), clientAddr)
 	if err != nil {
 		log.Printf("Failed to send Invite packet: %v\n", err)
 	}

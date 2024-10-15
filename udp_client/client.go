@@ -20,8 +20,7 @@ type sipClientConfig struct {
 }
 
 type RequestInvite struct {
-	AgentIP string
-	LPort   int
+	AgentAddr string
 }
 
 func setupClient() *sipClientConfig {
@@ -115,18 +114,14 @@ func main() {
 }
 
 func (client *sipClientConfig) sendCpReq() error {
-	reqInviteConn, err := net.DialUDP("udp", &net.UDPAddr{
-		IP:   client.srvAddr.IP,
-		Port: client.lTcpConn.Port,
-	}, &client.rTcpConn)
+	reqInviteConn, err := net.DialUDP("udp", &client.lTcpConn, &client.rTcpConn)
 	if err != nil {
 		log.Fatalf("Failed to connect to server at %s: %v\n", client.rTcpConn, err)
 	}
 	defer reqInviteConn.Close()
 
 	reqInvite := RequestInvite{
-		AgentIP: client.agentAddr.String(),
-		LPort:   client.agentAddr.Port,
+		AgentAddr: client.agentAddr.String(),
 	}
 
 	serializedReqInvite, err := json.Marshal(reqInvite)
