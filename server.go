@@ -34,7 +34,7 @@ var (
 func main() {
 
 	port := flag.Int("port", 8060, "Port to listen on")
-	tcpPort := flag.Int("tcpPort", 5061, "Port to listen on for TCP")
+	tcpPort := flag.Int("tcpPort", 15061, "Port to listen on for TCP")
 
 	lAddr := &net.UDPAddr{
 		IP:   net.ParseIP("0.0.0.0"), // Your local IP
@@ -72,7 +72,7 @@ func waitForRequestInvite(tcpPort int, udpConn *net.UDPConn) {
 	}
 	defer l.Close()
 
-	log.Printf("Listening on TCP port %d\n", tcpPort)
+	log.Printf("Listening for RequestInvite on TCP port %d\n", tcpPort)
 
 	for {
 		conn, err := l.Accept()

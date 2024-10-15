@@ -24,9 +24,73 @@ type RequestInvite struct {
 	LPort   int
 }
 
+func setupClient() *sipClientConfig {
+	// Define command-line flags for IP and port
+	ip := flag.String("ip", "", "Server IP address - required")
+	lip := flag.String("lip", "", "Local IP address - required")
+	badIp := flag.String("badip", "", "Bad Server IP address - optional")
+	rPort := flag.Int("rport", 8060, "Server port")
+	lPort := flag.Int("lport", 5060, "Local port")
+	rTcpPort := flag.Int("rtport", 15061, "Server TCP port for control plane")
+	lTcplPort := flag.Int("ltport", 15062, "local TCP port for control plane")
+	help := flag.Bool("help", false, "Display help")
+
+	// Parse command-line flags
+	flag.Parse()
+
+	// Display help if requested
+	if *help {
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
+
+	// Validate required
+	if *ip == "" || *lip == "" {
+		log.Fatalf("Server IP and Local IP are required\n")
+	}
+
+	log.Println("Starting UDP SIP protocol mock client...")
+	fmt.Println("Flags provided:")
+	flag.Visit(func(f *flag.Flag) {
+		fmt.Printf("-%s: %s\n", f.Name, f.Value)
+	})
+
+	badSrvAddr := &net.UDPAddr{}
+	if *badIp == "" {
+		log.Println("No bad server IP provided, will not try to reach bad server")
+		badSrvAddr = nil
+	} else {
+		badSrvAddr = &net.UDPAddr{
+			IP:   net.ParseIP(*badIp),
+			Port: *rPort,
+		}
+	}
+
+	// Set up the client
+	return &sipClientConfig{
+		srvAddr: net.UDPAddr{
+			IP:   net.ParseIP(*ip),
+			Port: *rPort,
+		},
+		badSrvAddr: badSrvAddr,
+		agentAddr: net.UDPAddr{
+			IP:   net.ParseIP(*lip),
+			Port: *lPort,
+		},
+		rTcpConn: net.TCPAddr{
+			IP:   net.ParseIP(*ip),
+			Port: *rTcpPort,
+		},
+		lTcpConn: net.TCPAddr{
+			IP:   net.ParseIP(*lip),
+			Port: *lTcplPort,
+		},
+	}
+}
+
 func main() {
 	client := setupClient()
-
+	log.Printf("finished setupClient")
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
@@ -52,7 +116,7 @@ func main() {
 
 func (client *sipClientConfig) sendTcpReq() error {
 	tcpConn, err := net.DialTCP("tcp", &net.TCPAddr{
-		IP:   client.agentAddr.IP,
+		IP:   client.srvAddr.IP,
 		Port: client.rTcpConn.Port,
 	}, &client.rTcpConn)
 	if err != nil {
@@ -141,69 +205,5 @@ func (client *sipClientConfig) tryReachBadServer(conn *net.UDPConn) {
 			time.Sleep(4 * time.Second)
 		}
 
-	}
-}
-
-func setupClient() *sipClientConfig {
-	// Define command-line flags for IP and port
-	ip := flag.String("ip", "", "Server IP address - required")
-	lip := flag.String("lip", "", "Local IP address - required")
-	badIp := flag.String("badip", "", "Bad Server IP address - optional")
-	rPort := flag.Int("rport", 8060, "Server port")
-	lPort := flag.Int("lport", 5060, "Local port")
-	rTcpPort := flag.Int("rtport", 5061, "Server TCP port for control plane")
-	lTcplPort := flag.Int("ltport", 5062, "local TCP port for control plane")
-	help := flag.Bool("help", false, "Display help")
-
-	// Parse command-line flags
-	flag.Parse()
-
-	// Display help if requested
-	if *help {
-		flag.PrintDefaults()
-		os.Exit(0)
-	}
-
-	// Validate required
-	if *ip == "" || *lip == "" {
-		log.Fatalf("Server IP and Local IP are required\n")
-	}
-
-	log.Println("Starting UDP SIP protocol mock client...")
-	fmt.Println("Flags provided:")
-	flag.Visit(func(f *flag.Flag) {
-		fmt.Printf("-%s: %s\n", f.Name, f.Value)
-	})
-
-	badSrvAddr := &net.UDPAddr{}
-	if *badIp == "" {
-		log.Println("No bad server IP provided, will not try to reach bad server")
-		badSrvAddr = nil
-	} else {
-		badSrvAddr = &net.UDPAddr{
-			IP:   net.ParseIP(*badIp),
-			Port: *rPort,
-		}
-	}
-
-	// Set up the client
-	return &sipClientConfig{
-		srvAddr: net.UDPAddr{
-			IP:   net.ParseIP(*ip),
-			Port: *rPort,
-		},
-		badSrvAddr: badSrvAddr,
-		agentAddr: net.UDPAddr{
-			IP:   net.ParseIP(*lip),
-			Port: *lPort,
-		},
-		rTcpConn: net.TCPAddr{
-			IP:   net.ParseIP(*ip),
-			Port: *rTcpPort,
-		},
-		lTcpConn: net.TCPAddr{
-			IP:   net.ParseIP(*lip),
-			Port: *lTcplPort,
-		},
 	}
 }
