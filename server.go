@@ -47,7 +47,9 @@ func main() {
 	}
 	defer conn.Close()
 	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go handleRead(conn, &wg)
+
 	log.Printf("Listening on %s\n", lAddr)
 	reqInvite := waitForRequestInvite(*tcpPort)
 

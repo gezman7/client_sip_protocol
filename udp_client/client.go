@@ -127,6 +127,11 @@ func (client *sipClientConfig) sendCpReq() error {
 	serializedReqInvite, err := json.Marshal(reqInvite)
 
 	_, err = reqInviteConn.Write(serializedReqInvite)
+	if err != nil {
+		log.Printf("Failed to send RequestInvite: %v\n", err)
+	}
+
+	log.Printf("Sent RequestInvite to server: %+v\n", client.rTcpConn)
 	return err
 }
 
