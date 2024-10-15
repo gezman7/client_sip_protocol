@@ -1,69 +1,82 @@
 package main
 
 import (
+	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"sync"
 	"time"
 )
 
+type sipClientConfig struct {
+	srvAddr    net.UDPAddr
+	badSrvAddr *net.UDPAddr
+	agentAddr  net.UDPAddr
+	rTcpConn   net.TCPAddr
+	lTcpConn   net.TCPAddr
+}
+
+type RequestInvite struct {
+	AgentIP string
+	LPort   int
+}
+
 func main() {
-	//// Define command-line flags for IP and port
-	//ip := flag.String("ip", "127.0.0.1", "Server IP address")
-	//port := flag.String("port", "8060", "Server port")
-	//help := flag.Bool("help", false, "Display help")
-	//
-	//// Parse command-line flags
-	//flag.Parse()
-	//
-	//// Display help if requested
-	//if *help {
-	//	fmt.Println("Usage:")
-	//	fmt.Println("  client -ip <server_ip> -port <server_port>")
-	//	fmt.Println("Options:")
-	//	fmt.Println("  -ip      Server IP address (default: 127.0.0.1)")
-	//	fmt.Println("  -port    Server port (default: 8060)")
-	//	fmt.Println("  -help    Display this help message")
-	//	return
-	//}
-	//
-	//// Validate IP and port
-	//if *ip == "" || *port == "" {
-	//	fmt.Println("Error: IP and port must both be specified.")
-	//	flag.Usage()
-	//	os.Exit(1)
-	//}
+	client := setupClient()
 
-	rAddr := listenForInvite()
-	log.Printf("Received Invite packet from server: %s\n", rAddr)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 
-	lAddr := &net.UDPAddr{
-		IP:   net.ParseIP("0.0.0.0"),
-		Port: 5060,
-	}
-	// Connect to the server
-	conn, err := net.DialUDP("udp", lAddr, rAddr)
+	conn, err := net.ListenUDP("udp", &client.agentAddr)
 	if err != nil {
-		log.Fatalf("Failed to connect to server at %s: %v\n", rAddr, err)
+		log.Fatalf("Failed to set up listening server: %v\n", err)
 	}
-	defer conn.Close()
+	go client.listenUdp(conn, wg)
 
-	log.Printf("Connected to server at %s\n", rAddr)
-
-	// Register the client with the server
-	err = sendPacket(conn, "Register")
+	// request invite from server with control plane tcp connection
+	err = client.sendTcpReq()
 	if err != nil {
-		log.Fatalf("Failed to send Register packet: %v\n", err)
+		log.Fatalf("Failed to send tcp RequestInvite: %v\n", err)
 	}
 
-	log.Printf("Sent Register packet to server: %v\n", conn.RemoteAddr())
+	if client.badSrvAddr != nil {
+		go client.tryReachBadServer(conn)
+	}
 
-	// Continuously listen for incoming OptionRequest packets and respond with ACK
-	buffer := make([]byte, 1024)
+	wg.Wait()
+
+}
+
+func (client *sipClientConfig) sendTcpReq() error {
+	tcpConn, err := net.DialTCP("tcp", &net.TCPAddr{
+		IP:   client.agentAddr.IP,
+		Port: client.rTcpConn.Port,
+	}, &client.rTcpConn)
+	if err != nil {
+		log.Fatalf("Failed to connect to server at %s: %v\n", client.rTcpConn, err)
+	}
+	defer tcpConn.Close()
+
+	reqInvite := RequestInvite{
+		AgentIP: client.agentAddr.String(),
+		LPort:   client.agentAddr.Port,
+	}
+
+	serializedReqInvite, err := json.Marshal(reqInvite)
+
+	_, err = tcpConn.Write(serializedReqInvite)
+	return err
+}
+
+func (client *sipClientConfig) listenUdp(conn *net.UDPConn, wg sync.WaitGroup) {
+	defer wg.Done()
 	for {
+		buffer := make([]byte, 1024)
 		// Set a read timeout in case we want to stop the client
 		conn.SetReadDeadline(time.Now().Add(2 * time.Minute))
-
 		// Receive the incoming packet from the server
 		n, err := conn.Read(buffer)
 		if err != nil {
@@ -73,50 +86,124 @@ func main() {
 
 		// Check if the packet is an "OptionRequest"
 		packet := string(buffer[:n])
-		if packet == "OptionRequest" {
-			fmt.Println("Received OptionRequest from server")
 
-			// Send an ACK back to the server
-			err = sendPacket(conn, "ACK")
-			if err != nil {
-				log.Printf("Failed to send ACK: %v\n", err)
-			} else {
-				fmt.Println("Sent ACK to server")
-			}
+		if packet == "Invite" {
+			log.Printf("Received Invite from server: %+v\n", conn.RemoteAddr())
+			sendRegister(conn, conn.RemoteAddr().String())
+			continue
+		}
+
+		if packet == "OptionRequest" {
+			client.handleRequestOption(conn)
 		}
 	}
 }
 
-func listenForInvite() *net.UDPAddr {
-	addr := net.UDPAddr{
-		Port: 5060,
-		IP:   net.ParseIP("0.0.0.0"),
-	}
-
-	log.Printf("Listening for Invite packet on port %d\n", addr.Port)
-	conn, err := net.ListenUDP("udp", &addr)
+func sendRegister(conn *net.UDPConn, addr string) {
+	serverAddr, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
-		log.Fatalf("Failed to set up server: %v\n", err)
+		log.Fatalf("Failed to resolve server address: %v\n", err)
 	}
-	defer conn.Close()
 
-	buffer := make([]byte, 1024)
-	n, remoteAddr, err := conn.ReadFromUDP(buffer)
+	_, err = conn.WriteToUDP([]byte("Register"), serverAddr)
 	if err != nil {
-		log.Fatalf("Failed to read from UDP connection: %v\n", err)
+		log.Fatalf("Failed to send Register packet: %v\n", err)
 	}
-
-	log.Printf("Received Invite packet from server: %s\n", remoteAddr.String())
-	packet := string(buffer[:n])
-	if packet == "Invite" {
-		return remoteAddr
-	}
-
-	log.Fatalf("Failed to receive Invite packet: %v\n", err)
-	return nil
 }
 
-func sendPacket(conn net.Conn, message string) error {
-	_, err := conn.Write([]byte(message))
-	return err
+func (client *sipClientConfig) handleRequestOption(conn *net.UDPConn) {
+	log.Printf("Received OptionRequest from server: %s\n", conn.RemoteAddr().String())
+
+	serverAddr, err := net.ResolveUDPAddr("udp", conn.RemoteAddr().String())
+	if err != nil {
+		log.Fatalf("Failed to resolve server address: %v\n", err)
+	}
+
+	_, err = conn.WriteToUDP([]byte("ACK"), serverAddr)
+	if err != nil {
+		log.Printf("Failed to send ACK: %v\n", err)
+	} else {
+		log.Printf("Sent ACK to server: %+v\n", serverAddr)
+	}
+}
+
+func (client *sipClientConfig) tryReachBadServer(conn *net.UDPConn) {
+	log.Printf("Trying to reach bad server at %s\n", client.badSrvAddr.String())
+	retryCounter := 0
+	for {
+		sendRegister(conn, client.badSrvAddr.String())
+		retryCounter++
+		if retryCounter > 8 {
+			log.Printf("Bad server reached maximum retries, waiting for 3 minutes before retrying\n")
+			time.Sleep(3 * time.Minute)
+			retryCounter = 0
+		} else {
+			time.Sleep(4 * time.Second)
+		}
+
+	}
+}
+
+func setupClient() *sipClientConfig {
+	// Define command-line flags for IP and port
+	ip := flag.String("ip", "", "Server IP address - required")
+	lip := flag.String("lip", "", "Local IP address - required")
+	badIp := flag.String("badip", "", "Bad Server IP address - optional")
+	rPort := flag.Int("rport", 8060, "Server port")
+	lPort := flag.Int("lport", 5060, "Local port")
+	rTcpPort := flag.Int("rtport", 5061, "Server TCP port for control plane")
+	lTcplPort := flag.Int("ltport", 5062, "local TCP port for control plane")
+	help := flag.Bool("help", false, "Display help")
+
+	// Parse command-line flags
+	flag.Parse()
+
+	// Display help if requested
+	if *help {
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
+
+	// Validate required
+	if *ip == "" || *lip == "" {
+		log.Fatalf("Server IP and Local IP are required\n")
+	}
+
+	log.Println("Starting UDP SIP protocol mock client...")
+	fmt.Println("Flags provided:")
+	flag.Visit(func(f *flag.Flag) {
+		fmt.Printf("-%s: %s\n", f.Name, f.Value)
+	})
+
+	badSrvAddr := &net.UDPAddr{}
+	if *badIp == "" {
+		log.Println("No bad server IP provided, will not try to reach bad server")
+		badSrvAddr = nil
+	} else {
+		badSrvAddr = &net.UDPAddr{
+			IP:   net.ParseIP(*badIp),
+			Port: *rPort,
+		}
+	}
+
+	// Set up the client
+	return &sipClientConfig{
+		srvAddr: net.UDPAddr{
+			IP:   net.ParseIP(*ip),
+			Port: *rPort,
+		},
+		badSrvAddr: badSrvAddr,
+		agentAddr: net.UDPAddr{
+			IP:   net.ParseIP(*lip),
+			Port: *lPort,
+		},
+		rTcpConn: net.TCPAddr{
+			IP:   net.ParseIP(*ip),
+			Port: *rTcpPort,
+		},
+		lTcpConn: net.TCPAddr{
+			IP:   net.ParseIP(*lip),
+			Port: *lTcplPort,
+		},
+	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -19,6 +20,11 @@ type Connection struct {
 	Created          time.Time
 }
 
+type RequestInvite struct {
+	AgentIP string
+	LPort   int
+}
+
 // Global variables
 var (
 	connections = make(map[string]*Connection)
@@ -27,22 +33,23 @@ var (
 
 func main() {
 
-	ip := flag.String("ip", "10.0.1.27", "Server IP address")
+	port := flag.Int("port", 8060, "Port to listen on")
+	tcpPort := flag.Int("tcpPort", 5061, "Port to listen on for TCP")
 
-	addr := &net.UDPAddr{
+	lAddr := &net.UDPAddr{
 		IP:   net.ParseIP("0.0.0.0"), // Your local IP
-		Port: 8060,                   // Desired local port
+		Port: *port,                  // Desired local port
 	}
 
 	// Start listening for incoming connections
-	conn, err := net.ListenUDP("udp", addr)
+	conn, err := net.ListenUDP("udp", lAddr)
 	if err != nil {
 		log.Fatalf("Failed to set up listening server: %v\n", err)
 	}
 	defer conn.Close()
 
-	log.Println("UDP Server started on port 8060")
-	go inviteClient(conn, *ip)
+	log.Printf("Listening on %s\n", lAddr)
+	go waitForRequestInvite(*tcpPort, conn)
 
 	for {
 		// Buffer to read incoming packets
@@ -58,16 +65,48 @@ func main() {
 	}
 }
 
-func inviteClient(conn *net.UDPConn, ip string) {
+func waitForRequestInvite(tcpPort int, udpConn *net.UDPConn) {
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", tcpPort))
+	if err != nil {
+		log.Fatalf("Failed to listen on TCP port %d: %v\n", tcpPort, err)
+	}
+	defer l.Close()
+
+	log.Printf("Listening on TCP port %d\n", tcpPort)
+
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			log.Printf("Failed to accept TCP connection: %v\n", err)
+			continue
+		}
+		buffer := make([]byte, 1024)
+		n, err := conn.Read(buffer)
+		if err != nil {
+			log.Printf("Failed to read from TCP connection: %v\n", err)
+			continue
+		}
+		var reqInvite RequestInvite
+		err = json.Unmarshal(buffer[:n], &reqInvite)
+		if err != nil {
+			log.Printf("Failed to unmarshal request invite: %v\n", err)
+			continue
+		}
+		log.Printf("Received request invite from %s port:%s\n", reqInvite.AgentIP, reqInvite.LPort)
+
+		go inviteClient(udpConn, reqInvite.AgentIP, reqInvite.LPort)
+	}
+}
+
+func inviteClient(conn *net.UDPConn, ip string, port int) {
 	time.Sleep(2 * time.Second)
 
 	clientAddr := &net.UDPAddr{
 		IP:   net.ParseIP(ip),
-		Port: 5060,
+		Port: port,
 	}
 
-	log.Printf("Inviting client at %+v\n with port 5060", clientAddr)
-
+	log.Printf("Inviting client at %+v\n", clientAddr)
 	_, err := conn.WriteToUDP([]byte("Invite"), clientAddr)
 	if err != nil {
 		log.Printf("Failed to send Invite packet: %v\n", err)
