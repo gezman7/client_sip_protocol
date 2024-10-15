@@ -137,7 +137,7 @@ func (client *sipClientConfig) listenUdp(conn *net.UDPConn, wg sync.WaitGroup) {
 		// Set a read timeout in case we want to stop the client
 		conn.SetReadDeadline(time.Now().Add(2 * time.Minute))
 		// Receive the incoming packet from the server
-		n, err := conn.Read(buffer)
+		n, rAddr, err := conn.ReadFromUDP(buffer)
 		if err != nil {
 			log.Printf("Error reading from server: %v\n", err)
 			break
@@ -147,13 +147,13 @@ func (client *sipClientConfig) listenUdp(conn *net.UDPConn, wg sync.WaitGroup) {
 		packet := string(buffer[:n])
 
 		if packet == "Invite" {
-			log.Printf("Received Invite from server: %+v\n", conn.RemoteAddr())
-			sendRegister(conn, conn.RemoteAddr().String())
+			log.Printf("Received Invite from server: %+v\n", rAddr)
+			sendRegister(conn, rAddr.String())
 			continue
 		}
 
 		if packet == "OptionRequest" {
-			client.handleRequestOption(conn)
+			client.handleRequestOption(conn, rAddr)
 		}
 	}
 }
@@ -170,19 +170,14 @@ func sendRegister(conn *net.UDPConn, addr string) {
 	}
 }
 
-func (client *sipClientConfig) handleRequestOption(conn *net.UDPConn) {
-	log.Printf("Received OptionRequest from server: %s\n", conn.RemoteAddr().String())
+func (client *sipClientConfig) handleRequestOption(conn *net.UDPConn, addr *net.UDPAddr) {
+	log.Printf("Received OptionRequest from server: %+v\n", addr)
 
-	serverAddr, err := net.ResolveUDPAddr("udp", conn.RemoteAddr().String())
-	if err != nil {
-		log.Fatalf("Failed to resolve server address: %v\n", err)
-	}
-
-	_, err = conn.WriteToUDP([]byte("ACK"), serverAddr)
+	_, err := conn.WriteToUDP([]byte("ACK"), addr)
 	if err != nil {
 		log.Printf("Failed to send ACK: %v\n", err)
 	} else {
-		log.Printf("Sent ACK to server: %+v\n", serverAddr)
+		log.Printf("Sent ACK to server: %+v\n", addr)
 	}
 }
 
