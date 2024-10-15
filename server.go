@@ -104,17 +104,13 @@ func inviteClient(conn *net.UDPConn, addr string) {
 		log.Printf("Failed to resolve UDP address from requestInvite: %v\n", err)
 	}
 
-	laddr := conn.LocalAddr()
-	udpLaddr, err := net.ResolveUDPAddr("udp", laddr.String())
 	log.Printf("Inviting client at %+v\n", clientAddr)
-	newConn, err := net.DialUDP("udp", udpLaddr, clientAddr)
+	_, err = conn.WriteToUDP([]byte("Invite"), clientAddr)
 	if err != nil {
-		log.Printf("Failed to dial UDP connection for invite to client: %v\n", err)
-		return
+		log.Printf("Failed to send Invite packet: %v\n", err)
 	}
-	defer newConn.Close()
 
-	_, err = newConn.WriteToUDP([]byte("Invite"), clientAddr)
+	_, err = conn.WriteToUDP([]byte("Invite"), clientAddr)
 	if err != nil {
 		log.Printf("Failed to send Invite packet: %v\n", err)
 	}
